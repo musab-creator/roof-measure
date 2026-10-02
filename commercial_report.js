@@ -141,7 +141,8 @@ function comPages(M, sat) {
     ${wallsHere.length ? wallTable(wallsHere) : ''}
     <div class="note">Parapet height runs from the roof surface to the top of the wall. Flashing runs up and over parapets up to 4 ft (height + ${COM_RULES.wallFlashExtraFt} ft); taller walls get ${COM_RULES.wallStepFlashMaxFt} ft with termination bar and counter-flashing. Edge height is the roof surface above the ground or lower roof outside the edge.${M.edges.some((e) => e.court) ? ' * = courtyard edge.' : ''}${edgeRows.length > first.length ? ' Continued on the next page.' : ''}</div><div style="flex:1"></div>`);
   for (let start = first.length, wStart = wallsHere.length; start < edgeRows.length || wStart < wallAll.length;) {
-    const chunk = edgeRows.slice(start, start + 80); const wl = chunk.length < 60 ? wallAll.slice(wStart, wStart + 12) : []; const hc = Math.ceil(chunk.length / 2);
+    // a continuation page holds up to 72 edges (36 per column), or a short edge list plus up to 10 wall rows
+    const chunk = edgeRows.slice(start, start + 72); const wl = chunk.length <= 30 ? wallAll.slice(wStart, wStart + 10) : []; const hc = Math.ceil(chunk.length / 2);
     pages.push(`${head2('Perimeter, parapets &amp; walls (continued)')}
       ${chunk.length ? `<div class="two" style="margin-top:10px"><div>${edgeTable(chunk.slice(0, hc))}</div><div>${chunk.length > hc ? edgeTable(chunk.slice(hc)) : ''}</div></div>` : ''}
       ${wl.length ? wallTable(wl) : ''}<div style="flex:1"></div>`);
