@@ -7,7 +7,7 @@
  * Needs geotiff.js (global GeoTIFF) and proj4 (global proj4) loaded before this file.
  */
 
-const AT = { tolM: 0.75, minRegionM2: 3, dpEpsPx: 5, regularize: true, dropBlobM2: 10, maxOtherStructures: 3, minOtherM2: 4, maxOtherM2: 95, maxOtherDistM: 28 };
+var AT = { v2: true, tolM: 0.75, minRegionM2: 3, dpEpsPx: 5, regularize: true, dropBlobM2: 10, maxOtherStructures: 3, minOtherM2: 4, maxOtherM2: 95, maxOtherDistM: 28 };
 
 // ------------------------------------------------------------------ data access
 async function solarDataLayers(lat, lng, radius) {
@@ -16,10 +16,18 @@ async function solarDataLayers(lat, lng, radius) {
   if (!r.ok) { let m = 'HTTP ' + r.status; try { const j = await r.json(); m = (j.error && j.error.message) || m; } catch (_) { /* ignore */ } throw new Error('Data layers: ' + m); }
   return r.json();
 }
-async function loadTiff(url) {
-  const r = await fetch(url + '&key=' + encodeURIComponent(state.key));
-  if (!r.ok) throw new Error('GeoTIFF download failed (' + r.status + ')');
-  const tiff = await GeoTIFF.fromArrayBuffer(await r.arrayBuffer());
+async function loadTiff(url, cacheName) {
+  let buf = null;
+  // local development only: keep downloaded rasters on disk so reloading the page does not re-buy the same data
+  const devCache = cacheName && location.hostname === 'localhost';
+  if (devCache) { try { const c = await fetch('/reports/' + encodeURIComponent(cacheName)); if (c.ok) buf = await c.arrayBuffer(); } catch (_) { /* not cached */ } }
+  if (!buf) {
+    const r = await fetch(url + '&key=' + encodeURIComponent(state.key));
+    if (!r.ok) throw new Error('GeoTIFF download failed (' + r.status + ')');
+    buf = await r.arrayBuffer();
+    if (devCache) { try { await fetch('/save?name=' + encodeURIComponent(cacheName), { method: 'POST', body: buf }); } catch (_) { /* best effort */ } }
+  }
+  const tiff = await GeoTIFF.fromArrayBuffer(buf);
   const img = await tiff.getImage();
   const data = (await img.readRasters())[0];
   const w = img.getWidth(), h = img.getHeight();
@@ -287,6 +295,12 @@ function classifyChain(chain, A, B, geo, insidePx, outsidePx) {
 
 // ------------------------------------------------------------------ main
 async function traceBuilding(resp, tif, mask, comp, geo, opts) {
+  if (AT.v2 && typeof traceBuildingV2 === 'function' && !(opts && opts.v1)) {
+    try { const r = traceBuildingV2(resp, tif, mask, comp, geo, opts); if (r && r.facets.length) return r; } catch (e) { console.warn('v2 trace failed, falling back to v1', e); }
+  }
+  return traceBuildingV1(resp, tif, mask, comp, geo, opts);
+}
+async function traceBuildingV1(resp, tif, mask, comp, geo, opts) {
   // resp: Solar buildingInsights for this component; returns {facets:[{path,pitch,azimuth}], edges:[{type,path}], unassignedPct}
   const { w, h } = tif;
   const segs = (resp && resp.solarPotential && resp.solarPotential.roofSegmentStats) || [];
@@ -386,9 +400,25 @@ async function autoTraceRoof(opts = {}) {
   const halfDiag = Math.hypot((bb.ne.longitude - bb.sw.longitude) * kx, (bb.ne.latitude - bb.sw.latitude) * ky) / 2;
   const radius = Math.min(100, Math.max(15, Math.ceil(halfDiag + 12)));
   if (!opts.quiet) toast('Downloading roof height model...');
-  const layers = await solarDataLayers(cLat, cLng, radius);
-  if (!layers.maskUrl || !layers.dsmUrl) throw new Error('Data layers did not include a mask and DSM');
-  const [maskT, dsmT] = await Promise.all([loadTiff(layers.maskUrl), loadTiff(layers.dsmUrl)]);
+  // cache the downloaded rasters per building in this session: re-tracing (or re-printing) the same roof costs nothing extra
+  const cacheKey = main.name + '|' + radius;
+  const cache = (window.__layerCache = window.__layerCache || {});
+  let cached = cache[cacheKey];
+  if (!cached) {
+    const safe = String(main.name || 'b').replace(/[^A-Za-z0-9]/g, '_') + '_' + radius;
+    const mName = '_cache_' + safe + '_mask.tif', dName = '_cache_' + safe + '_dsm.tif';
+    let mT = null, dT = null, layers = null;
+    if (location.hostname === 'localhost') {
+      try { const ok = (await fetch('/reports/' + mName)).ok && (await fetch('/reports/' + dName)).ok; if (ok) { mT = await loadTiff('unused', mName); dT = await loadTiff('unused', dName); layers = { imageryDate: main.imageryDate, fromDiskCache: true }; } } catch (_) { mT = null; }
+    }
+    if (!mT) {
+      layers = await solarDataLayers(cLat, cLng, radius);
+      if (!layers.maskUrl || !layers.dsmUrl) throw new Error('Data layers did not include a mask and DSM');
+      [mT, dT] = await Promise.all([loadTiff(layers.maskUrl, mName), loadTiff(layers.dsmUrl, dName)]);
+    }
+    cached = cache[cacheKey] = { layers, maskT: mT, dsmT: dT };
+  }
+  const { layers, maskT, dsmT } = cached;
   if (maskT.w !== dsmT.w || maskT.h !== dsmT.h) throw new Error('Mask and DSM sizes differ');
   const w = maskT.w, h = maskT.h;
   const mask = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) mask[i] = maskT.data[i] > 0 ? 1 : 0;
@@ -401,17 +431,29 @@ async function autoTraceRoof(opts = {}) {
     ref, E: (x) => { const i = Math.floor(x); const f = x - i; return i >= w ? Ecol[w] : Ecol[i] + f * (Ecol[Math.min(i + 1, w)] - Ecol[i]); }, N: (y) => { const i = Math.floor(y); const f = y - i; return i >= h ? Nrow[h] : Nrow[i] + f * (Nrow[Math.min(i + 1, h)] - Nrow[i]); },
     pxM2: Math.abs((Ecol[1] - Ecol[0]) * (Nrow[1] - Nrow[0])),
     center: (i) => { const x = i % w, y = (i - x) / w; return { e: (Ecol[x] + Ecol[x + 1]) / 2, n: (Nrow[y] + Nrow[y + 1]) / 2 }; },
+    X: (E) => (E - Ecol[0]) / (Ecol[w] - Ecol[0]) * w, Y: (N) => (N - Nrow[0]) / (Nrow[h] - Nrow[0]) * h,
   };
-  // the component under the building centre (search nearby if the centre pixel is off the mask)
-  const cx0 = Math.round(w / 2), cy0 = Math.round(h / 2);
-  let sx = -1, sy = -1;
-  outer: for (let rr = 0; rr < 40; rr++) for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) { const x = cx0 + dx, y = cy0 + dy; if (x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x]) { sx = x; sy = y; break outer; } }
-  if (sx < 0) throw new Error('Building mask is empty at this location');
   // keep only mask pixels inside the building's own bounding box (padded); attached neighbours and row houses otherwise merge in
   const padM = 2.5;
   const bE0 = (bb.sw.longitude - cLng) * kx - padM, bE1 = (bb.ne.longitude - cLng) * kx + padM, bN0 = (bb.sw.latitude - cLat) * ky - padM, bN1 = (bb.ne.latitude - cLat) * ky + padM;
   const clipped = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) { const N = geo.N(y + 0.5); if (N < bN0 || N > bN1) continue; for (let x = 0; x < w; x++) { const i = y * w + x; if (!mask[i]) continue; const E = geo.E(x + 0.5); if (E >= bE0 && E <= bE1) clipped[i] = 1; } }
+  // the main building is the mask piece that fills Google's building box best (the box centre can fall outside an L-shaped house)
+  let sx = -1, sy = -1;
+  {
+    let pieces = allComponents(clipped, w, h);
+    const cx0 = (geo.X(0) || w / 2), cy0 = (geo.Y(0) || h / 2);
+    if (!pieces.length) {
+      // Google's building box missed the mask (box from older imagery): take the nearest roof piece instead
+      const near = allComponents(mask, w, h).filter((pc) => pc.n * geo.pxM2 >= 20 && Math.hypot(pc.cx - cx0, pc.cy - cy0) * Math.sqrt(geo.pxM2) < 20);
+      for (const pc of near) for (let i = 0; i < w * h; i++) if (pc.member[i]) clipped[i] = 1;
+      pieces = near;
+    }
+    if (!pieces.length) throw new Error('Building mask is empty at this location');
+    let best = null, bestScore = -Infinity;
+    for (const pc of pieces) { const d = Math.hypot(pc.cx - cx0, pc.cy - cy0) * Math.sqrt(geo.pxM2); const score = pc.n * geo.pxM2 - d * 2; if (score > bestScore) { bestScore = score; best = pc; } }
+    for (let i = 0; i < w * h; i++) if (best.member[i]) { sx = i % w; sy = (i - sx) / w; break; }
+  }
   const mainFlood = floodComponent(clipped, w, h, sx, sy);
   if (!mainFlood.n) throw new Error('Building mask is empty inside the building bounds');
   let msx = 0, msy = 0, mminx = w, mmaxx = 0, mminy = h, mmaxy = 0;
