@@ -6,6 +6,9 @@ param([int]$Port = 8080, [switch]$Open)
 $root = (Resolve-Path (Split-Path -Parent $MyInvocation.MyCommand.Path)).Path
 $reports = Join-Path $root "reports"
 if (-not (Test-Path $reports)) { New-Item -ItemType Directory -Path $reports | Out-Null }
+# large height-model cache files (_ccache_*) stay on this PC, outside OneDrive
+$cache = Join-Path $env:LOCALAPPDATA "RoofMeasureCache"
+if (-not (Test-Path $cache)) { New-Item -ItemType Directory -Path $cache | Out-Null }
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")
 $listener.Start()
@@ -21,7 +24,7 @@ while ($listener.IsListening) {
       $name = $req.QueryString["name"]; if (-not $name) { $name = "report.html" }
       $name = ($name -replace '[\\/:*?"<>|]', '_')
       $ms = New-Object IO.MemoryStream; $req.InputStream.CopyTo($ms)
-      $target = Join-Path $reports $name
+      $target = if ($name.StartsWith("_ccache_")) { Join-Path $cache $name } else { Join-Path $reports $name }
       [IO.File]::WriteAllBytes($target, $ms.ToArray())
       $body = [Text.Encoding]::UTF8.GetBytes('{"saved":"' + ($target -replace '\\', '\\\\') + '"}')
       $res.ContentType = "application/json"; $res.ContentLength64 = $body.Length; $res.OutputStream.Write($body, 0, $body.Length)
@@ -29,7 +32,9 @@ while ($listener.IsListening) {
       if ($path -eq "/") { $path = "/index.html" }
       $file = Join-Path $root ($path.TrimStart("/") -replace "/", "\")
       $full = [IO.Path]::GetFullPath($file)
-      if ($full.StartsWith($root) -and (Test-Path $full -PathType Leaf)) {
+      $okRoot = $root
+      if ($path.StartsWith("/reports/_ccache_")) { $full = [IO.Path]::GetFullPath((Join-Path $cache ($path.Substring(9) -replace '[\\/:*?"<>|]', '_'))); $okRoot = $cache }
+      if ($full.StartsWith($okRoot) -and (Test-Path $full -PathType Leaf)) {
         $bytes = [IO.File]::ReadAllBytes($full)
         $ext = [IO.Path]::GetExtension($full).ToLower()
         if ($mime.ContainsKey($ext)) { $res.ContentType = $mime[$ext] } else { $res.ContentType = "application/octet-stream" }

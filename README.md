@@ -34,6 +34,42 @@ The "Recommended" waste column is computed the way Roofr does it, from the cut e
 
 Tested on 50 random Jacksonville houses; see `reports/_batch_results.json` for the numbers.
 
+## Commercial tab (flat / low-slope roofs)
+
+Click **Commercial** at the top of the left panel. Enter the address, then press **Measure commercial roof**. The tool downloads Google's roof mask and 3D surface model for the whole building (10 cm pixels up to about 650 ft across, 25 cm pixels for larger buildings) and measures:
+
+- the roof outline squared to the building, with courtyards left open
+- roof sections by elevation, with plan area, slope in inches per foot, height above ground and fall direction; steep sections are flagged and use sloped area
+- every perimeter edge as a parapet wall (with its height), a high wall, or an open roof edge
+- walls between roof levels with their height, and level joints
+- rooftop units, exhaust fans, curbs, vents, duct runs and expansion joints, with sizes, heights and curb flashing length
+- ASCE 7-22 roof wind zones 1', 1, 2 and 3 for the measured roof height
+- a drain estimate and the overflow scuppers a parapet roof needs
+
+**Commercial report** (Print / PDF or Download) has these pages:
+
+1. Cover with key numbers and the aerial with the measured outline.
+2. Roof plan.
+3. Measurements and roof sections.
+4. Perimeter, parapets and walls, with a parapet area table.
+5. Rooftop equipment, penetrations and drainage.
+6. Wind zones and Jacksonville code notes.
+7. Material estimate for the chosen system.
+8. Side-by-side comparison of TPO, PVC, EPDM, SBS modified bitumen and silicone coating.
+9. Method and limits.
+
+**Material estimates** cover:
+
+- membrane rolls, perimeter half-sheets, fasteners and plates or bonding adhesive
+- seam items, corners, pipe boots and pitch pans
+- polyiso layers that reach the R-25 continuous insulation required for Jacksonville tear-offs, plus cover board and tapered insulation
+- coping, edge metal, termination bar and counter-flashing
+- drains, scuppers and walkway pads
+
+Coverage rates come from Carlisle, GAF, Johns Manville and GacoFlex data sheets. Code notes cover the FBC 2023, the COJ wind-speed line (125 / 130 mph), FBC-Energy R-25ci, FBC-Plumbing 1108 overflow drainage and FBC-EB 706 reroof rules.
+
+Enter site counts the surface model cannot see (drains, scuppers, skylights, hatches) in the panel to override the estimates.
+
 ## Structures, sheds and special cases
 
 - **Detached structures.** Facets that touch each other form one structure. A shed or detached garage you trace separately becomes Structure #2 automatically, with its own summary page.
@@ -91,5 +127,8 @@ Check pitch with the **Street View** and **Google Earth 3D** links in the Proper
 - `index.html` - the app
 - `app.js` - map, tracing, measurement engine
 - `report.js` - Roofr-format report, company details, brand material catalog
+- `autotrace.js`, `autotrace2.js` - automatic roof tracing from Google's roof height model
+- `commercial.js` - commercial (flat roof) measuring, materials and wind zones
+- `commercial_report.js` - the commercial roof report
 - `styles.css` - screen and print styles
 - `serve.ps1` / `Start Roof Measure (local server).bat` - optional local server

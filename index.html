@@ -16,6 +16,7 @@
       </div>
       <button id="btnNew" class="ghost small" title="Clear everything and start a new roof">New roof</button>
     </header>
+    <nav class="modebar"><button id="modeRes" class="mode on" title="Houses: pitched roofs, Roofr-style report">Residential</button><button id="modeCom" class="mode" title="Commercial buildings: flat / low-slope roofs, commercial report">Commercial</button></nav>
 
     <!-- SETUP -->
     <details class="panel" id="panelSetup" open>
@@ -49,6 +50,40 @@
         <div class="row links" id="extLinks" hidden>
           <a id="lnkStreet" target="_blank" rel="noopener">Street View</a>
           <a id="lnkEarth" target="_blank" rel="noopener">Google Earth 3D</a>
+        </div>
+      </div>
+    </details>
+
+    <!-- COMMERCIAL -->
+    <details class="panel com-only" id="panelCommercial" open>
+      <summary>2. Commercial roof</summary>
+      <div class="body">
+        <p class="muted">Flat and low-slope roofs: outline, roof levels, parapet walls and heights, rooftop units, wind zones and a full material estimate. Enter the address above first.</p>
+        <div class="row wrap"><button id="btnCom" class="primary">Measure commercial roof</button></div>
+        <div id="comOut" class="out"></div>
+        <h4>Roof system</h4>
+        <div class="grid2">
+          <label>System <select id="c_system">
+            <option value="tpo_ma">TPO 60 mil, mechanically attached</option><option value="tpo_fa">TPO 60 mil, fully adhered</option>
+            <option value="pvc_ma">PVC 60 mil, mechanically attached</option><option value="epdm_fa">EPDM 60 mil, fully adhered</option>
+            <option value="modbit">SBS modified bitumen, 2-ply</option><option value="silicone">Silicone coating (restoration)</option></select></label>
+          <label>Waste % <input id="c_waste" type="number" step="1" min="0" max="30"></label>
+          <label>Insulation target R <input id="c_rTarget" type="number" step="1" min="0" max="60" title="FBC Energy climate zone 2: R-25 continuous above deck. 0 = no new insulation"></label>
+          <label>Wind speed (mph) <input id="c_wind" type="number" step="5" min="90" max="200"></label>
+        </div>
+        <label class="chk"><input type="checkbox" id="c_cover"> 1/2" HD cover board</label>
+        <label class="chk"><input type="checkbox" id="c_taper"> Tapered insulation / crickets</label>
+        <h4>Site counts (override)</h4>
+        <div class="grid2">
+          <label>Roof drains <input id="c_drains" type="number" min="0" placeholder="estimate"></label>
+          <label>Overflow scuppers <input id="c_scuppers" type="number" min="0" placeholder="estimate"></label>
+          <label>Skylights <input id="c_skylights" type="number" min="0" placeholder="0"></label>
+          <label>Roof hatches <input id="c_hatches" type="number" min="0" placeholder="0"></label>
+          <label>Roof height ft <input id="c_height" type="number" min="0" placeholder="measured"></label>
+        </div>
+        <div class="row wrap" style="margin-top:10px">
+          <button id="btnComReport" class="primary">Print / PDF commercial report</button>
+          <button id="btnComDownload">Download commercial report</button>
         </div>
       </div>
     </details>
@@ -202,5 +237,7 @@
 <script src="autotrace.js"></script>
 <script src="autotrace2.js"></script>
 <script src="report.js"></script>
+<script src="commercial.js"></script>
+<script src="commercial_report.js"></script>
 </body>
 </html>
