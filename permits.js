@@ -31,7 +31,8 @@ const PERMIT_PORTAL = {
 const BEACH_CITIES = /JACKSONVILLE BEACH|JAX BEACH|ATLANTIC BEACH|NEPTUNE BEACH|BALDWIN/i;
 const permit = { key: null, data: null, pending: null, manual: JSON.parse(localStorage.getItem('rm.permitManual') || '{}') };
 
-const pDate = (s) => (s ? new Date(s) : null);
+// date-only values ("2026-05-06") are calendar dates: read them as local dates, not midnight UTC (which shows a day early)
+const pDate = (s) => { if (!s) return null; const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s); };
 const pFmt = (s) => { const d = pDate(s); return d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'; };
 const yearsSince = (d, now = new Date()) => (d && !isNaN(d) ? (now - d) / (365.25 * 86400000) : null);
 const isLocalApp = () => location.hostname === 'localhost' || location.hostname === '127.0.0.1';
