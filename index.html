@@ -60,6 +60,7 @@
         <p class="muted">Pulls Google's 3D roof model for this building: total roof area, footprint, and every roof plane with its pitch. Covers most US homes.</p>
         <div class="row">
           <button id="btnSolar" class="primary" disabled>Get roof data</button>
+          <button id="btnAuto" class="primary" disabled title="Builds every facet and line automatically from Google's roof height model">Auto-trace roof</button>
           <button id="btnScan" disabled title="Probes 24 points around the pin to find detached garages, sheds and pool houses (24 Solar API lookups)">Scan for other structures</button>
         </div>
         <label class="chk" style="margin-top:6px"><input type="checkbox" id="chkSolar" checked> Show planes on map</label>
@@ -195,7 +196,10 @@
 </div>
 
 <div id="report"></div>
+<script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
 <script src="app.js"></script>
+<script src="autotrace.js"></script>
 <script src="report.js"></script>
 </body>
 </html>

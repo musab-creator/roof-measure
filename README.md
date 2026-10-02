@@ -28,6 +28,12 @@ A self-contained roof measurement and takeoff tool, like Roofr Measurements or E
 
 The "Recommended" waste column is computed the way Roofr does it, from the cut edges on the roof: hips + valleys + rakes + step flashing in linear feet per square of roof area, roughly 1% plus 1.18% per foot-per-square, rounded. This reproduces every recommendation in your Roofr reports (6%, 7%, 11%, 12%, 33% and 10% for flat roofs). Each structure gets its own recommendation. The waste selector in the app only drives the quick materials list in the sidebar.
 
+## Auto-trace (no hand tracing)
+
+**Auto-trace roof** (panel 2, after *Get roof data*) builds the whole measurement automatically. It downloads Google's building mask and roof height model for the house (10 cm per pixel), assigns every roof pixel to one of Google's roof planes, turns the planes into facets with straight edges snapped to the building's axis and 45-degree diagonals, and classifies every edge as eave, rake, ridge, hip, valley, step flashing, wall flashing or transition from the plane geometry. Outbuildings inside the frame (sheds, detached garages) are traced as separate structures. One auto-trace costs about 10 cents of Google API usage. You can still adjust any facet or line afterwards with the normal tools.
+
+Tested on 50 random Jacksonville houses; see `reports/_batch_results.json` for the numbers.
+
 ## Structures, sheds and special cases
 
 - **Detached structures.** Facets that touch each other form one structure. A shed or detached garage you trace separately becomes Structure #2 automatically, with its own summary page.

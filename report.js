@@ -53,6 +53,7 @@ function reportData() {
 // ------------------------------------------------------------------ diagram (Roofr style)
 const FACET_SHADES = ['#eaf1fa', '#d9e6f5', '#c8daf0', '#b9cfeb', '#aac4e6'];
 function facetDirection(x, scope) {
+  if (x.f.azimuth != null) { const a = x.f.azimuth * Math.PI / 180; return { dx: Math.sin(a), dy: -Math.cos(a) }; }   // Solar API azimuth: compass direction the plane faces
   // down-slope direction: toward the facet edge that lies on an eave line; else toward the longest edge no other facet shares
   const path = x.m.path;
   const c = centroid(path);

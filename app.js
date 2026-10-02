@@ -328,6 +328,7 @@ async function runSolar() {
   try {
     state.solar = await fetchSolar(state.location.lat, state.location.lng);
     drawSolar(); renderSolar(); recompute();
+    $('#btnAuto').disabled = false;
   } catch (err) {
     out.innerHTML = `<span class="err">${esc(err.message || err)}</span>`;
   }
@@ -551,7 +552,7 @@ function facetStyle(f, selected) {
 }
 function addFacet(path, pitch, name, flags = {}) {
   const id = nextId++;
-  const f = { id, name: name || `F${state.facets.length + 1}`, pitch, twoStory: !!flags.twoStory, twoLayer: !!flags.twoLayer, excluded: !!flags.excluded };
+  const f = { id, name: name || `F${state.facets.length + 1}`, pitch, twoStory: !!flags.twoStory, twoLayer: !!flags.twoLayer, excluded: !!flags.excluded, azimuth: flags.azimuth == null ? null : flags.azimuth };
   f.shape = new google.maps.Polygon({ map, paths: path, clickable: state.tool === 'select', zIndex: f.excluded ? 12 : 10, geodesic: false, ...facetStyle(f, false) });
   state.facets.push(f); attachShape(f, 'facet'); recompute();
   return f;
@@ -725,7 +726,7 @@ function serialize() {
   return {
     app: 'roof-measure', version: 2, savedAt: new Date().toISOString(),
     jobName: state.jobName, address: state.address, location: state.location, defaultPitch: state.defaultPitch, waste: state.waste, mat: state.mat,
-    facets: state.facets.map((f) => ({ name: f.name, pitch: f.pitch, twoStory: f.twoStory, twoLayer: f.twoLayer, excluded: f.excluded, path: pathToLiteral(f.shape) })),
+    facets: state.facets.map((f) => ({ name: f.name, pitch: f.pitch, twoStory: f.twoStory, twoLayer: f.twoLayer, excluded: f.excluded, azimuth: f.azimuth, path: pathToLiteral(f.shape) })),
     edges: state.edges.map((e) => ({ type: e.type, pitch: e.pitch, path: pathToLiteral(e.shape) })),
     solar: state.solar, otherSolar: state.otherSolar,
   };
@@ -741,7 +742,7 @@ function restore(d) {
   for (const f of d.facets || []) addFacet(f.path, f.pitch, f.name, f);
   for (const e of d.edges || []) addEdge(EDGE_TYPES[e.type] ? e.type : 'unspecified', e.path, e.pitch);
   state.solar = d.solar || null; state.otherSolar = d.otherSolar || [];
-  drawSolar(); renderSolar();
+  drawSolar(); renderSolar(); $('#btnAuto').disabled = !state.solar;
   recompute();
   if (state.facets.length) { const b = new google.maps.LatLngBounds(); state.facets.forEach((f) => f.shape.getPath().forEach((p) => b.extend(p))); map.fitBounds(b, 80); }
 }
@@ -820,6 +821,7 @@ function wire() {
   $('#address').addEventListener('keydown', (e) => { if (e.key === 'Enter') goToAddress(); });
   $('#btnSolar').onclick = runSolar;
   $('#btnScan').onclick = scanStructures;
+  $('#btnAuto').onclick = async () => { const b = $('#btnAuto'); b.disabled = true; b.textContent = 'Tracing...'; try { await autoTraceRoof(); } catch (e) { toast('Auto-trace failed: ' + e.message, true); } b.disabled = false; b.textContent = 'Auto-trace roof'; };
   $('#chkSolar').onchange = (e) => { state.showSolar = e.target.checked; drawSolar(); recompute(); };
   $('#chkFacetEdges').onchange = (e) => { state.showFacetEdges = e.target.checked; recompute(); };
   $('#waste').onchange = (e) => { state.waste = +e.target.value; recompute(); };
