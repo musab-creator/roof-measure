@@ -1,0 +1,5 @@
+reports/
+.claude/
+_publish/
+*.lnk
+Thumbs.db
