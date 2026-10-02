@@ -20,7 +20,25 @@ while ($listener.IsListening) {
   $req = $ctx.Request; $res = $ctx.Response
   try {
     $path = [Uri]::UnescapeDataString($req.Url.AbsolutePath)
-    if ($req.HttpMethod -eq "POST" -and $path -eq "/save") {
+    if ($path -eq "/relay/pao" -or $path -eq "/relay/clay") {
+      # fixed public-record relays only (these sites block cross-site requests from the browser); no open proxy
+      $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36'
+      try {
+        if ($path -eq "/relay/pao") {
+          $re = ($req.QueryString["re"] -replace '[^0-9]', '')
+          if ($re.Length -lt 6 -or $re.Length -gt 12) { throw "bad RE" }
+          $r = Invoke-WebRequest -Uri ("https://paopropertysearch.coj.net/Basic/Detail.aspx?RE=" + $re) -UseBasicParsing -TimeoutSec 30 -Headers @{ 'User-Agent' = $ua }
+          $body = [Text.Encoding]::UTF8.GetBytes($r.Content); $res.ContentType = "text/html; charset=utf-8"
+        } else {
+          if ($req.HttpMethod -ne "POST") { throw "POST only" }
+          $sr = New-Object IO.StreamReader($req.InputStream, [Text.Encoding]::UTF8); $json = $sr.ReadToEnd()
+          if ($json.Length -gt 20000) { throw "too large" }
+          $r = Invoke-WebRequest -Uri "https://claycountyfl-energovpub.tylerhost.net/apps/selfservice/api/energov/search/search" -Method Post -Body $json -ContentType "application/json;charset=UTF-8" -UseBasicParsing -TimeoutSec 60 -Headers @{ 'User-Agent' = $ua; 'tenantId' = '1'; 'tenantName' = 'ClayCountyFL'; 'Tyler-TenantUrl' = 'ClayCountyFL'; 'Tyler-Tenant-Culture' = 'en-US' }
+          $body = [Text.Encoding]::UTF8.GetBytes($r.Content); $res.ContentType = "application/json; charset=utf-8"
+        }
+      } catch { $res.StatusCode = 502; $body = [Text.Encoding]::UTF8.GetBytes('{"error":"relay failed"}'); $res.ContentType = "application/json" }
+      $res.Headers.Add("Cache-Control", "no-store"); $res.ContentLength64 = $body.Length; $res.OutputStream.Write($body, 0, $body.Length)
+    } elseif ($req.HttpMethod -eq "POST" -and $path -eq "/save") {
       $name = $req.QueryString["name"]; if (-not $name) { $name = "report.html" }
       $name = ($name -replace '[\\/:*?"<>|]', '_')
       $ms = New-Object IO.MemoryStream; $req.InputStream.CopyTo($ms)

@@ -101,6 +101,7 @@ function comPages(M, sat) {
   pages.push(`<h1>Commercial Roof Report</h1>
     <div class="cover-row"><div class="l">Prepared by ${esc(company.name)}${company.license ? '<br>License ' + esc(company.license) : ''}${company.rep ? '<br>' + esc(company.rep) : ''}</div><div class="r">${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}${M.buildingName ? '<br>' + esc(M.buildingName) : ''}</div></div>
     <div class="addr">${esc(addr)}</div>
+    ${typeof permitCoverLine === 'function' ? permitCoverLine() : ''}
     <div class="ckpi"><div><b>${fmt(T.totalSF)}</b><span>Total roof sqft</span></div><div><b>${fmt(T.squares, 1)}</b><span>Squares</span></div><div><b>${M.sections.length}</b><span>Roof sections</span></div><div><b>${T.heightFt ? fmt(T.heightFt) + "'" : '-'}</b><span>Roof height</span></div>
     <div><b>${fmt(T.perimLF)}'</b><span>Perimeter</span></div><div><b>${fmt(T.parLF)}'</b><span>Parapet wall</span></div><div><b>${T.rtus.length}</b><span>HVAC units</span></div><div><b>${T.predSlope == null ? 'Steep' : fmt(T.predSlope, 2) + '"/ft'}</b><span>Main slope</span></div></div>
     ${sat ? `<img class="cover-img" style="margin-top:.25in;max-height:5in" src="${sat}" alt="">` : '<div class="empty" style="margin-top:.4in">Satellite image unavailable</div>'}
@@ -190,6 +191,8 @@ function comPages(M, sat) {
     <div class="note" style="margin-top:8px">Main membrane quantities for the same measured roof: ${fmt(T.lowSF)} sqft low-slope field, ${fmt(T.parFlashSF + T.wallFlashSF)} sqft wall flashing, ${fmt(T.curbLF)} LF of curbs. Insulation, metal and drainage are the same for every system except coatings (no tear-off, no insulation).</div>
     <table style="margin-top:10px"><tr><th>System</th><th>Main quantities (waste included)</th></tr>${mats.map((m) => `<tr><td style="width:2.2in">${esc(m.system)}<br><span class="small">${m.wastePct}% waste</span></td><td class="small">${mainQ(m)}</td></tr>`).join('')}</table>
     <div class="sec">Shared items</div><table class="kv"><tr><td>Coping cap, parapets</td><td>${Math.ceil(T.parLF / COM_RULES.copingFt)} pcs (${fmt(T.parLF)} LF)</td></tr><tr><td>Edge metal, open edges</td><td>${Math.ceil(T.edgeLF / COM_RULES.edgeMetalFt)} pcs (${fmt(T.edgeLF)} LF)</td></tr><tr><td>Termination bar</td><td>${Math.ceil((T.parLF + T.wallLF) / COM_RULES.termBarFt)} pcs</td></tr><tr><td>Insulation boards per layer (4' x 8', 5% waste)</td><td>${fmt(Math.ceil(T.lowSF / 32 * 1.05))}</td></tr><tr><td>Drains / overflow</td><td>${T.drains} / ${T.scuppers}</td></tr></table><div style="flex:1"></div>`);
+  // 9 permit history and roof age
+  if (typeof permitReportPage === 'function' && state.location) pages.push(permitReportPage(head2('Permit history &amp; roof age')));
   // 9 method and limits
   pages.push(`${head2('Method, assumptions &amp; limits')}
     <ul class="notes" style="margin-top:12px">
@@ -214,7 +217,9 @@ const COM_CODE_NOTES = [
   'Tear off to the deck if the roof is wet, deteriorated, blistered, or already has two or more coverings (FBC-EB 706.3). No more than 25% of a roof section may be replaced in 12 months without bringing the section to current code (706.1.1).',
   'Rooftop units sit on curbs at least 8" high (FBC 1510.10). File the Notice of Commencement before the first inspection when the contract is over $5,000 (F.S. 713.135). Permits through JAXEPICS.',
 ];
-async function comBuild(M) { const url = comCoverUrl(M); const sat = await imageToDataURL(url, 9000); return { html: comPages(M, sat || url), sat, url }; }
+async function comBuild(M) {
+  if (typeof permitEnsure === 'function') { try { await permitEnsure(); } catch (_) { /* shown as unavailable */ } }
+  const url = comCoverUrl(M); const sat = await imageToDataURL(url, 9000); return { html: comPages(M, sat || url), sat, url }; }
 async function comPrint() {
   toast('Building commercial report...');
   const { html } = await comBuild(com.model);

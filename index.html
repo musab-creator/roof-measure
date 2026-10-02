@@ -51,6 +51,13 @@
           <a id="lnkStreet" target="_blank" rel="noopener">Street View</a>
           <a id="lnkEarth" target="_blank" rel="noopener">Google Earth 3D</a>
         </div>
+        <h4>Permits &amp; roof age</h4>
+        <div id="permitOut" class="out"></div>
+        <div class="grid2" style="margin-top:6px">
+          <label>Last roof permit date (if not found) <input id="pm_date" type="date"></label>
+          <label>Permit # <input id="pm_number" type="text" placeholder="optional"></label>
+        </div>
+        <div class="row wrap" style="margin-top:6px"><button id="btnPermits" class="ghost small" title="Search the city / county permit records again">Look up permits again</button></div>
       </div>
     </details>
 
@@ -237,6 +244,7 @@
 <script src="autotrace.js"></script>
 <script src="autotrace2.js"></script>
 <script src="report.js"></script>
+<script src="permits.js"></script>
 <script src="commercial.js"></script>
 <script src="commercial_report.js"></script>
 </body>

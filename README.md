@@ -70,6 +70,18 @@ Coverage rates come from Carlisle, GAF, Johns Manville and GacoFlex data sheets.
 
 Enter site counts the surface model cannot see (drains, scuppers, skylights, hatches) in the panel to override the estimates.
 
+## Permit history and roof age
+
+When you enter an address, the Property panel looks up the permit history. Both reports then show the roof age on the cover and include a **Permit history & roof age** page. That page lists the last roof permit issued and the last one submitted, every roofing permit, other permits at the address, the year built and the roof cover type.
+
+- **City of Jacksonville:** every permit at the address comes from the city's JAXEPICS system, with type, status, submitted date and issued date. The city's server only answers the desktop app (the local server started by the Roof Measure shortcut). On the public web page, use the city search link or type the last roof permit date by hand.
+- **Duval County Property Appraiser:** the roof structure and roof cover come through the local server.
+- **Clay County:** permits come from the county's EnerGov system through the local server. Its online records start in January 2023.
+- **Jacksonville Beach, Atlantic Beach, Neptune Beach, St. Johns and Nassau:** these have no public permit feed. The panel links to their permit portal, and you can enter the last roof permit date by hand.
+- **Year built, any Florida county:** comes from the Florida Department of Revenue parcel roll.
+
+Roof age counts from the issue date of the newest roofing permit. If no roofing permit is on file, it counts from the year built.
+
 ## Structures, sheds and special cases
 
 - **Detached structures.** Facets that touch each other form one structure. A shed or detached garage you trace separately becomes Structure #2 automatically, with its own summary page.
@@ -130,5 +142,6 @@ Check pitch with the **Street View** and **Google Earth 3D** links in the Proper
 - `autotrace.js`, `autotrace2.js` - automatic roof tracing from Google's roof height model
 - `commercial.js` - commercial (flat roof) measuring, materials and wind zones
 - `commercial_report.js` - the commercial roof report
+- `permits.js` - permit history and roof age (city / county permit records, year built)
 - `styles.css` - screen and print styles
 - `serve.ps1` / `Start Roof Measure (local server).bat` - optional local server

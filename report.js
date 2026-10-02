@@ -206,6 +206,7 @@ const REPORT_CSS = `
 .rp .rec { font-size: 9px; color: #777; font-weight: 400; display: block; }
 .rp .mat td, .rp .mat th { padding: 4px 8px; }
 .rp .empty { padding: 30px; text-align: center; color: #777; border: 1px dashed #ccc; font-size: 11px; }
+.rp table.tight td, .rp table.tight th { padding: 3px 6px; font-size: 10px; }
 `;
 
 // ------------------------------------------------------------------ pages
@@ -224,6 +225,7 @@ function coverPage(R, satSrc, n) {
   return page(`<h1>Roof Report</h1>
     <div class="cover-row"><div class="l">Prepared by ${esc(company.name)}</div><div class="r">${sqftUp(total)} sqft<br>${facets} facets<br>Predominant pitch ${pitch == null ? '-' : pitch === 0 ? 'Flat' : pitchLabel(pitch)}</div></div>
     <div class="addr">${esc(state.address || '')}</div>
+    ${typeof permitCoverLine === 'function' ? permitCoverLine() : ''}
     ${satSrc ? `<img class="cover-img" src="${satSrc}" alt="">` : '<div class="empty" style="margin-top:.5in">Satellite image unavailable</div>'}
     <div class="cap">${imagery}</div><div style="flex:1"></div>`, n);
 }
@@ -296,6 +298,8 @@ function materialsPage(R, n) {
 
 // ------------------------------------------------------------------ build / print / download
 async function buildReportHTML() {
+  // permit history / roof age (city permit records, year built); a failed lookup never blocks the report
+  if (typeof permitEnsure === 'function') { try { await permitEnsure(); } catch (_) { /* shown as unavailable */ } }
   const R = reportData();
   const url = coverPhotoUrl(R);
   const satSrc = await imageToDataURL(url);
@@ -307,6 +311,7 @@ async function buildReportHTML() {
     if (R.t.structures.length > 1) for (const S of R.t.structures) pages.push((n) => structurePage(R, S, n, `Structure #${S.index} summary`));
     pages.push((n) => structurePage(R, R.t, n, 'Report summary'));
   }
+  if (typeof permitReportPage === 'function' && state.location) pages.push((n) => page(permitReportPage(head(R, 'Permit history &amp; roof age')), n));
   pages.push((n) => materialsPage(R, n));
   const html = pages.map((fn, i) => fn(i + 1)).join('');
   return { html, R, satSrc, satForPrint };
