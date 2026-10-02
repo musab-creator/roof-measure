@@ -64,6 +64,41 @@ async function jaxPermits(term) {
     address: v.obj.Address || '', link: v.link ? PERMIT_URL.jaxSite + v.link : '', roof: /roof/i.test(v.obj.PermitType || '') || /roof/i.test(v.description || ''),
   }));
 }
+// JAXEPICS advanced search by parcel (RE number "162112 0625"): every permit on the parcel, any type, exact match
+const jaxCols = { list: null };
+const jaxDate = (s) => { const m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}` : null; };
+async function jaxByRE(re) {
+  const api = 'https://jaxepicsapi.coj.net/api/AdvancedSearches/';
+  if (!jaxCols.list) { const r = await fetch(api + 'GetColumns/82'); if (!r.ok) throw new Error('permit search HTTP ' + r.status); jaxCols.list = Object.fromEntries((await r.json()).map((c) => [c.ColumnId, c])); }
+  const obj = { SearchString: re };
+  const filter = { SavedSearchFilterId: 0, SavedSearchId: 0, ColumnId: 28, Column: jaxCols.list[28], OperatorId: 1, Order: -1, Obj: obj, groupedSectionControls: {}, Completed: true, EvalValueString: JSON.stringify(obj), IsActive: true, SavedSearch: null, DisplayInWidget: true, PinnedInWidget: false, Sort: 0 };
+  const body = { SavedSearchColumns: [1, 2, 3, 4, 5, 6, 7, 8, 16, 18, 19, 20, 25, 28].map((id) => ({ ColumnId: id })), SavedSearchFilters: [filter], UserSavedSearches: [], UserSavedSearchWidgets: [], TableId: 82 };
+  const r = await fetch(`${api}Advanced?page=1&pageSize=500&filter=&sortActive=DateIssued&sortDirection=desc&forSpreadSheet=false`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('permit search HTTP ' + r.status);
+  const j = await r.json();
+  return (j.values || []).filter((v) => v.FullPermitNumber).map((v) => ({
+    number: v.FullPermitNumber, type: v.PermitTypeDescription || '', use: v.ProposedUseDescription || '', structure: v.StructureTypeDescription || '', work: [v.WorkTypeDescription, v.WorkSubTypeDescription].filter(Boolean).join(' - '),
+    status: v.StatusDescription || '', submitted: jaxDate(v.DateLastSubmitted), issued: jaxDate(v.DateIssued), finaled: jaxDate(v.DateFinal), contractor: v.CompanyName || '',
+    cost: parseFloat(v.TotalCost) || null, address: v.Address || '', link: v.FullPermitNumber_Click ? PERMIT_URL.jaxSite + '/' + v.FullPermitNumber_Click : '', roof: /roof/i.test(v.PermitTypeDescription || ''),
+  }));
+}
+// published copy of every City of Jacksonville roofing permit, split by the first three digits of the parcel number
+// (built by reports/_tools/permitindex.js; used when the city's server will not answer this website directly)
+const roofIndex = { meta: null, buckets: {} };
+async function roofIndexLookup(reNoSpace, addrKey) {
+  const base = new URL('permits/', location.href).href;
+  if (!roofIndex.meta) { const r = await fetch(base + 'meta.json', { cache: 'no-cache' }); if (!r.ok) throw new Error('permit index unavailable'); roofIndex.meta = await r.json(); }
+  const b = reNoSpace.slice(0, 3);
+  if (!roofIndex.buckets[b]) { roofIndex.buckets[b] = fetch(base + 'roof_' + b + '.json').then((r) => (r.ok ? r.json() : {})); }
+  let rows = (await roofIndex.buckets[b])[reNoSpace] || [];
+  if (!rows.length && addrKey) {   // older permits recorded without a parcel number, matched by street address + ZIP
+    if (!roofIndex.addr) roofIndex.addr = fetch(base + 'addr.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    rows = (await roofIndex.addr)[addrKey] || [];
+  }
+  const st = roofIndex.meta.statuses || [];
+  return rows.map((x) => ({ number: x[0], type: 'Roofing Permit', use: x[7] === 'N' ? 'Non-Residential' : 'Residential', structure: '', work: x[4] || '', status: st[x[2]] || '',
+    submitted: x[8] || null, issued: x[1] || null, finaled: x[3] || null, contractor: x[5] || '', cost: x[6] || null, address: '', link: x[9] ? PERMIT_URL.jaxSite + '/Permit/View/' + x[9] : '', roof: true }));
+}
 async function clayPermits(keyword) {
   const body = { Keyword: keyword, ExactMatch: true, SearchModule: 1, FilterModule: 2, SearchMainAddress: false, PlanCriteria: { PageNumber: 0, PageSize: 0 },
     PermitCriteria: { PermitTypeId: 'none', PermitWorkclassId: 'none', PermitStatusId: 'none', PageNumber: 0, PageSize: 0, SortAscending: false },
@@ -99,20 +134,33 @@ async function permitLookup(loc, address) {
   } catch (e) { out.errors.push('Florida parcel data: ' + e.message); }
   if (out.county === 'Duval') {
     let p = null;
-    try { p = await parcelAt(PERMIT_URL.cojParcels, loc, 'RE,RE_NOSPACE,STREET_NO,ST_DIR,ST_NAME,ST_TYPE,UNIT_NO,ADDRCITY,DESCPU'); } catch (e) { out.errors.push('City parcel data: ' + e.message); }
+    try { p = await parcelAt(PERMIT_URL.cojParcels, loc, 'RE,RE_NOSPACE,STREET_NO,ST_DIR,ST_NAME,ST_TYPE,UNIT_NO,ADDRCITY,ZIPCODE,DESCPU'); } catch (e) { out.errors.push('City parcel data: ' + e.message); }
     const city = (p && p.ADDRCITY) || (out.parcel && out.parcel.city) || '';
     if (p) out.parcel = { ...(out.parcel || {}), re: p.RE, reNoSpace: p.RE_NOSPACE, cityAddress: [p.STREET_NO, p.ST_DIR, p.ST_NAME, p.ST_TYPE].filter((x) => x && String(x).trim()).join(' '), use: p.DESCPU };
     if (BEACH_CITIES.test(city)) { out.jurisdiction = city; out.portal = PERMIT_PORTAL.beaches; out.notes.push(`${city} issues its own building permits; the City of Jacksonville system does not list them.`); }
     else {
-      out.jurisdiction = 'City of Jacksonville'; out.portal = PERMIT_PORTAL.coj; out.source = 'City of Jacksonville JAXEPICS';
+      out.jurisdiction = 'City of Jacksonville'; out.portal = PERMIT_PORTAL.coj;
       const term = (out.parcel && out.parcel.cityAddress) || String(address || '').split(',')[0];
-      try {
-        const rows = await jaxPermits(term);
-        const lead = normAddr(term).split(' ').slice(0, 2).join(' ');   // street number + first word of the street name
-        out.permits = rows.filter((x) => normAddr(x.address).startsWith(lead)); out.searched = true; out.searchTerm = term;
-      } catch (e) {
-        out.errors.push(isLocalApp() ? 'City permit search: ' + e.message : 'The city permit system only answers the Roof Measure desktop app (local server). Open the city search with the link below, or enter the last roof permit by hand.');
+      const lead = normAddr(term).split(' ').slice(0, 2).join(' ');   // street number + first word of the street name
+      let live = null, liveErr = null;
+      // 1) live city records, matched exactly by parcel number (works from the desktop app)
+      if (p && p.RE) { try { live = await jaxByRE(p.RE); } catch (e) { liveErr = e.message; } }
+      // condo / multi-unit parcels: roof permits are often filed under the street address of the building
+      if (live && !live.some((x) => x.roof)) {
+        try { const rows = await jaxPermits(term); const have = new Set(live.map((x) => x.number)); for (const x of rows) if (normAddr(x.address).startsWith(lead) && !have.has(x.number)) live.push(x); } catch (_) { /* parcel results stand */ }
+      } else if (!live && !(p && p.RE)) {
+        try { live = (await jaxPermits(term)).filter((x) => normAddr(x.address).startsWith(lead)); } catch (e) { liveErr = e.message; }
       }
+      out.recordsFrom = 1985;   // City of Jacksonville roofing permits are on line from mid-1984
+      if (live) { out.permits = live; out.searched = true; out.source = 'City of Jacksonville JAXEPICS (live)'; out.searchTerm = p && p.RE ? `parcel ${p.RE}` : term; }
+      // 2) otherwise the published copy of every city roofing permit (public website)
+      else if (p && p.RE_NOSPACE) {
+        try {
+          out.permits = await roofIndexLookup(p.RE_NOSPACE, normAddr(term) + '|' + String(p.ZIPCODE || '').slice(0, 5)); out.searched = true; out.indexOnly = true; out.searchTerm = `parcel ${p.RE}`;
+          out.source = `City of Jacksonville roofing permit records (copy through ${roofIndex.meta.through || roofIndex.meta.updated})`;
+          out.notes.push(`Roofing permits issued after ${pFmt(roofIndex.meta.through)} show once the permit copy is refreshed; the desktop app reads the city live.`);
+        } catch (e) { out.errors.push('City permit records: ' + (liveErr || e.message)); }
+      } else out.errors.push('City permit search: ' + (liveErr || 'no parcel number for this location'));
       if (p && p.RE_NOSPACE) {
         out.paoUrl = PERMIT_URL.pao + p.RE_NOSPACE;
         if (isLocalApp()) { try { const pr = await paoRecord(p.RE_NOSPACE); out.roofCover = pr.roofCover; out.roofStruct = pr.roofStruct; if (pr.yearBuilt) out.yearBuilt = pr.yearBuilt; } catch (e) { out.errors.push('Property appraiser: ' + e.message); } }
@@ -124,7 +172,7 @@ async function permitLookup(loc, address) {
       try {
         let rows = await clayPermits(out.parcel.address);
         if (!rows.length) rows = await clayPermits(out.parcel.address.split(' ').slice(0, -1).join(' '));
-        out.permits = rows; out.searched = true; out.searchTerm = out.parcel.address;
+        out.permits = rows; out.searched = true; out.searchTerm = out.parcel.address; out.recordsFrom = 2023;
         out.notes.push('Clay County\'s online permit records start in January 2023; older permits are in the county\'s archive.');
       } catch (e) { out.errors.push('Clay County permit search: ' + e.message); }
     } else out.errors.push('Clay County permits are looked up by the Roof Measure desktop app (local server).');
@@ -149,7 +197,8 @@ function roofAgeInfo(d, now = new Date()) {
   let basis = null, age = null, date = null, number = null;
   if (m.date) { date = pDate(m.date); age = yearsSince(date, now); basis = 'entered'; number = m.number || null; }
   else if (lastIssued) { date = pDate(lastIssued.issued || lastIssued.finaled); age = yearsSince(date, now); basis = 'permit'; number = lastIssued.number; }
-  else if (d && d.yearBuilt) { age = now.getFullYear() - d.yearBuilt; basis = 'built'; }
+  else if (d && d.yearBuilt && (!d.searched || !d.recordsFrom || d.yearBuilt >= d.recordsFrom)) { age = now.getFullYear() - d.yearBuilt; basis = 'built'; }   // likely the original roof
+  else if (d && d.yearBuilt) basis = 'unknown';   // built before the permit records start and no roof permit since
   return { age, basis, date, number, lastIssued, lastSubmitted, roofCount: roofs.length, oldest };
 }
 function roofAgeSentence(d) {
@@ -157,7 +206,8 @@ function roofAgeSentence(d) {
   const ageTxt = (a) => (a < 1 ? 'under 1 year' : 'about ' + yrs(a));
   if (R.basis === 'entered') return `Roof age ${ageTxt(R.age)}: last roof permit ${R.number ? R.number + ' ' : ''}dated ${pFmt(R.date)} (entered).`;
   if (R.basis === 'permit') return `Roof age ${ageTxt(R.age)}: last roof permit ${R.number} issued ${pFmt(R.date)}${R.lastIssued && R.lastIssued.status ? ' (' + R.lastIssued.status.toLowerCase() + ')' : ''}.`;
-  if (R.basis === 'built') return d && d.searched ? `No roofing permit on file${R.oldest ? ' in city records back to ' + R.oldest.getFullYear() : ''}. Built ${d.yearBuilt}: the roof may be up to ${yrs(R.age)} old.` : `Built ${d.yearBuilt}; roof permit history not checked (roof could be up to ${yrs(R.age)} old).`;
+  if (R.basis === 'built') return d && d.searched ? `No roofing permit on file since the building went up in ${d.yearBuilt}: likely the original roof, ${ageTxt(R.age)} old.` : `Built ${d.yearBuilt}; no permit records for this area, so the roof could be up to ${yrs(R.age)} old.`;
+  if (R.basis === 'unknown') return `No roofing permit on file since ${d.jurisdiction || 'the'} permit records began in ${d.recordsFrom}. Built ${d.yearBuilt}: the roof's age can't be confirmed from permits, so inspect it.`;
   return 'Roof age unknown: no permit data for this location.';
 }
 
@@ -194,11 +244,13 @@ function permitReportPage(headHtml) {
   const d = permit.data; const R = roofAgeInfo(d);
   const list = d ? d.permits.slice().sort((a, b) => (pDate(b.issued || b.submitted) || 0) - (pDate(a.issued || a.submitted) || 0)) : [];
   const roofRows = list.filter((p) => p.roof), other = list.filter((p) => !p.roof);
+  const roofHead = '<tr><th>Permit</th><th>Work</th><th>Status</th><th>Contractor</th><th class="num">Issued</th><th class="num">Final</th></tr>';
+  const roofRow = (p) => `<tr><td>${esc(p.number)}</td><td>${esc((p.work || p.type).slice(0, 40))}</td><td>${esc(p.status.slice(0, 16))}</td><td>${esc((p.contractor || '-').slice(0, 30))}</td><td class="num">${pFmt(p.issued)}</td><td class="num">${pFmt(p.finaled)}</td></tr>`;
   const row = (p) => `<tr><td>${esc(p.number)}</td><td>${esc([p.type, p.work].filter(Boolean).join(' - ').slice(0, 70))}</td><td>${esc(p.status.slice(0, 18))}</td><td class="num">${pFmt(p.submitted)}</td><td class="num">${pFmt(p.issued)}</td></tr>`;
   const head = '<tr><th>Permit</th><th>Type</th><th>Status</th><th class="num">Submitted</th><th class="num">Issued</th></tr>';
   const kv = [
-    ['Roof age', R.age == null ? 'Unknown' : `${R.age < 1 ? 'under 1 year' : Math.floor(R.age) + (Math.floor(R.age) === 1 ? ' year' : ' years')}${R.basis === 'built' ? (d && d.searched ? ' (since construction; no roof permit on file)' : ' (since construction; permits not checked)') : ''}`],
-    ['Last roof permit issued', R.lastIssued ? `${R.lastIssued.number}, ${pFmt(R.lastIssued.issued || R.lastIssued.finaled)} (${R.lastIssued.status || '-'})` : (R.basis === 'entered' ? `${R.number || ''} ${pFmt(R.date)} (entered)` : 'None on file')],
+    ['Roof age', R.age == null ? (R.basis === 'unknown' ? `Unknown (no roof permit since ${d.recordsFrom}; built ${d.yearBuilt})` : 'Unknown') : `${R.age < 1 ? 'under 1 year' : Math.floor(R.age) + (Math.floor(R.age) === 1 ? ' year' : ' years')}${R.basis === 'built' ? (d && d.searched ? ' (original roof: no roof permit since construction)' : ' (since construction; permits not checked)') : ''}`],
+    ['Last roof permit issued', R.lastIssued ? `${R.lastIssued.number}, ${pFmt(R.lastIssued.issued || R.lastIssued.finaled)} (${R.lastIssued.status || '-'})${R.lastIssued.contractor ? ', ' + R.lastIssued.contractor : ''}` : (R.basis === 'entered' ? `${R.number || ''} ${pFmt(R.date)} (entered)` : 'None on file')],
     ['Last roof permit submitted', R.lastSubmitted ? `${R.lastSubmitted.number}, ${pFmt(R.lastSubmitted.submitted)} (${R.lastSubmitted.status || '-'})` : 'None on file'],
     ['Roof permits on file', String(R.roofCount)],
     ['Year built / effective year', d ? `${d.yearBuilt || '-'} / ${d.effYear || '-'}` : '-'],
@@ -211,7 +263,7 @@ function permitReportPage(headHtml) {
   return `${headHtml}
     <div class="note" style="font-size:12px;margin-top:12px"><b>${esc(roofAgeSentence(d))}</b></div>
     <div class="sec">Roof age</div><table class="kv">${kv.map(([l, v]) => `<tr><td>${l}</td><td>${esc(v)}</td></tr>`).join('')}</table>
-    <div class="sec">Roofing permits</div>${shownRoof.length ? `<table class="tight">${head}${shownRoof.map(row).join('')}</table>${roofRows.length > shownRoof.length ? `<div class="note">${roofRows.length - shownRoof.length} older roofing permits not listed.</div>` : ''}` :`<div class="empty">${d && d.searched ? 'No roofing permits on file for this address.' : 'Permit records were not available for this address.'}</div>`}
+    <div class="sec">Roofing permits</div>${shownRoof.length ? `<table class="tight">${roofHead}${shownRoof.map(roofRow).join('')}</table>${roofRows.length > shownRoof.length ? `<div class="note">${roofRows.length - shownRoof.length} older roofing permits not listed.</div>` : ''}` :`<div class="empty">${d && d.searched ? 'No roofing permits on file for this address.' : 'Permit records were not available for this address.'}</div>`}
     ${shownOther.length ? `<div class="sec">Other permits at this address</div><table class="tight">${head}${shownOther.map(row).join('')}</table>${other.length > shownOther.length ? `<div class="note">${other.length - shownOther.length} older permits not listed.</div>` : ''}` : ''}
     <div class="note">Source: ${esc(d && d.source ? d.source : 'public permit records')}${d && d.searchTerm ? ` (address searched: ${esc(d.searchTerm)})` : ''}; year built from the Florida Department of Revenue parcel roll${d && d.roofCover ? ' and the Duval County Property Appraiser' : ''}. Checked ${pFmt(d ? d.checked : null)}. Roof age is counted from the issue date of the newest roofing permit; work done without a permit, or before the city's online records, is not shown.${d && d.notes.length ? ' ' + d.notes.map(esc).join(' ') : ''}</div><div style="flex:1"></div>`;
 }
