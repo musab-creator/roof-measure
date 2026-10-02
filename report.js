@@ -343,9 +343,19 @@ async function downloadReport() {
 // ------------------------------------------------------------------ wiring (runs after app.js)
 (function wireReport() {
   if (!document.querySelector('link[href*="fonts.googleapis.com/css2?family=Inter"]')) document.head.insertAdjacentHTML('beforeend', FONT_LINK);
-  const guard = () => { if (!state.facets.length && !state.edges.length && !state.solar) { toast('Nothing to report yet. Get roof data or trace the roof first.', true); return false; } return true; };
-  $('#btnReport').onclick = () => { if (guard()) printReport(); };
-  $('#btnReportHTML').onclick = () => { if (guard()) downloadReport(); };
+  // the diagram, length, area, pitch and summary pages need a traced roof: trace it automatically when there is none yet
+  const ensureTrace = async () => {
+    if (state.facets.length) return true;
+    if (!state.solar && state.location && typeof runSolar === 'function') await runSolar();
+    if (!state.solar) { if (!state.edges.length) { toast('Nothing to report yet. Enter an address and get roof data first.', true); return false; } return true; }
+    if (typeof autoTraceRoof !== 'function') return true;
+    toast('Tracing the roof for the diagram pages...');
+    try { await autoTraceRoof(); } catch (e) { toast('Auto-trace failed (' + e.message + '). Trace the roof by hand to get the diagram pages.', true); }
+    return true;
+  };
+  const run = (fn, btn) => async () => { const b = $(btn); b.disabled = true; try { if (await ensureTrace()) await fn(); } finally { b.disabled = false; } };
+  $('#btnReport').onclick = run(printReport, '#btnReport');
+  $('#btnReportHTML').onclick = run(downloadReport, '#btnReportHTML');
   for (const k of Object.keys(COMPANY_DEFAULT)) {
     const el = $('#co_' + k); if (!el) continue;
     el.value = company[k] || '';
