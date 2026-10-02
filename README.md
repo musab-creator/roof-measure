@@ -107,14 +107,17 @@ You need one Google Maps Platform API key.
    - Geocoding API
    - Solar API
    - Maps Static API (the satellite photo on the report cover)
-3. **APIs & Services > Credentials > Create credentials > API key.** Click the key, set *API restrictions* to the four APIs above. Leave *Website restrictions* at "None" if you open the HTML file directly by double-clicking it (browsers send no referrer for local files).
+   - Places API (New) (address suggestions; without it the suggestions come from Esri's free geocoder)
+3. **APIs & Services > Credentials > Create credentials > API key.** Click the key, set *API restrictions* to the APIs above. Leave *Website restrictions* at "None" if you open the HTML file directly by double-clicking it (browsers send no referrer for local files).
 4. Double-click `index.html`, paste the key into the *Google Maps API key* box, click **Save**.
 
 The key is stored only in your browser's local storage. It is never written into downloaded reports.
 
 ## Daily use
 
-1. Enter the address, press Go. The map jumps to the house at street-level zoom.
+1. Start typing the address. Suggestions appear under the box after the first few characters, nearest to the map area first. Pick one with the mouse or the arrow keys and Enter, or type the full address and press Go. The map jumps to the house at street-level zoom.
+   - **No address?** Double-click the house on the map to lock it in. Or press **Pick on map** and click the house. You can also move the map with the arrow keys (Shift for small steps) until the red + sits on the roof, then press Enter or **Lock center**. Esc cancels.
+   - The locked house gets a red pin. Drag the pin to move it. The address box fills in from Google's nearest street address. If there is none, it shows the coordinates.
 2. Click **Get roof data**. Read off total area, squares, and main pitch. Click *Use X/12 as default pitch*. Uncheck *Show planes on map* to see the roof clearly.
 3. Pick the **Facet** tool, click around each roof plane. Double-click, press Enter, or click the first corner to close. Points snap to existing corners so adjacent facets share edges.
 4. Trace **Ridge / Hip / Valley / Eave / Rake** lines on top for linear footage. Those drive the starter, ice and water, cap, drip edge and valley quantities on the report.
@@ -145,5 +148,7 @@ Check pitch with the **Street View** and **Google Earth 3D** links in the Proper
 - `commercial.js` - commercial (flat roof) measuring, materials and wind zones
 - `commercial_report.js` - the commercial roof report
 - `permits.js` - permit history and roof age (city / county permit records, year built)
+- `pin.js` - lock in a house from the map (double-click, pick mode, arrow keys, draggable pin)
+- `autocomplete.js` - address suggestions while typing (Google Places, with Esri as a fallback)
 - `styles.css` - screen and print styles
 - `serve.ps1` / `Start Roof Measure (local server).bat` - optional local server

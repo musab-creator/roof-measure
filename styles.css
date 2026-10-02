@@ -145,3 +145,19 @@ body:not(.mode-com) .com-only { display: none; }
 body.mode-com #panelAuto, body.mode-com #panelTrace, body.mode-com #panelSummary, body.mode-com #btnReport, body.mode-com #btnReportHTML, body.mode-com #toolbar { display: none; }
 .out table.mini { margin-top: 6px; font-size: 12px; }
 .out .kv { font-size: 14px; margin-bottom: 4px; }
+
+/* address autocomplete */
+.field { position: relative; }
+.ac-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 40; margin-top: 2px; background: #0f1216; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.45); overflow: hidden; }
+.ac-item { padding: 8px 10px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #1c2129; }
+.ac-item:hover, .ac-item.on { background: var(--panel2); color: #fff; }
+.ac-foot { padding: 4px 10px; font-size: 10px; color: var(--muted); text-align: right; }
+/* pick a house on the map */
+.pickrow { margin-top: 6px; align-items: center; gap: 8px; }
+.pickrow .small { font-size: 12px; }
+#btnPick.on { background: var(--accent); color: #111; border-color: var(--accent); }
+#crosshair { display: none; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none; z-index: 6; }
+#crosshair::before, #crosshair::after { content: ""; position: absolute; background: #ff3b30; box-shadow: 0 0 0 1px rgba(0,0,0,.6); }
+#crosshair::before { left: 16px; top: 0; width: 2px; height: 34px; }
+#crosshair::after { top: 16px; left: 0; height: 2px; width: 34px; }
+body.picking #crosshair { display: block; }

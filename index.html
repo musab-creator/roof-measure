@@ -47,6 +47,11 @@
             <button id="btnGo" class="primary">Go</button>
           </div>
         </div>
+        <div class="row wrap pickrow">
+          <button id="btnPick" class="ghost small" title="Click the house on the map, or steer with the arrow keys and press Enter">Pick on map</button>
+          <button id="btnLockCenter" class="primary small" hidden title="Lock the house under the + in the middle of the map (Enter)">Lock center</button>
+          <span class="muted small">or double-click a house on the map</span>
+        </div>
         <div class="row links" id="extLinks" hidden>
           <a id="lnkStreet" target="_blank" rel="noopener">Street View</a>
           <a id="lnkEarth" target="_blank" rel="noopener">Google Earth 3D</a>
@@ -227,6 +232,7 @@
       <button id="btnDelete" class="tool danger" title="Delete selected (Del)">Delete</button>
     </div>
     <div id="hint"></div>
+    <div id="crosshair" aria-hidden="true"></div>
     <div id="nokey" class="overlay">
       <div class="card">
         <h2>Roof Measure</h2>
@@ -245,6 +251,8 @@
 <script src="autotrace2.js"></script>
 <script src="report.js"></script>
 <script src="permits.js"></script>
+<script src="pin.js"></script>
+<script src="autocomplete.js"></script>
 <script src="commercial.js"></script>
 <script src="commercial_report.js"></script>
 </body>
