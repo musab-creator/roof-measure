@@ -814,6 +814,8 @@ function wire() {
     state.key = k; loadMaps();
   };
   $('#apiKey').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnSaveKey').click(); });
+  $('#btnShowKey').onclick = () => { const i = $('#apiKey'); const show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#btnShowKey').textContent = show ? 'Hide' : 'Show'; };
+  $('#btnCopyKey').onclick = async () => { const v = $('#apiKey').value.trim(); if (!v) { toast('No key saved yet', true); return; } try { await navigator.clipboard.writeText(v); toast('API key copied'); } catch (e) { $('#apiKey').type = 'text'; $('#apiKey').select(); toast('Press Ctrl+C to copy'); } };
   $('#btnGo').onclick = goToAddress;
   $('#address').addEventListener('keydown', (e) => { if (e.key === 'Enter') goToAddress(); });
   $('#btnSolar').onclick = runSolar;
